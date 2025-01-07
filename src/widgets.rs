@@ -37,7 +37,7 @@ impl<'a> Boxed<'a> {
         for task in self.tasks {
             // Split title into lines and add indentation characters
             let title = wrap_text(
-                task.title.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                task.title.as_deref().unwrap_or(""),
                 Options::new(self.width as usize - 6).subsequent_indent("   ").initial_indent("• ")
                 .word_splitter(WordSplitter::Hyphenation(Builder {
                         language: Language::EnglishUS, // TODO: Make this configurable via the TOML
@@ -48,19 +48,19 @@ impl<'a> Boxed<'a> {
 
             // Split notes into lines and add indentation characters
             let notes = task.notes.as_ref().map(|notes_str| wrap_text(
-                &notes_str,
+                notes_str,
                 Options::new(self.width as usize - 6).subsequent_indent("     ").initial_indent("  • ")
                 .word_splitter(WordSplitter::Hyphenation(Builder {
                         language: Language::EnglishUS, // TODO: Make this configurable via the TOML
                         patterns: Default::default(),
                         exceptions: Default::default()
                 }.into()))
-            ).iter().map(|cow| cow.to_owned()).collect::<Vec<_>>());
+            ).to_vec());
 
             // Set color based on due date: orange for today, white for future, red for past due
             let color =
                 if let Some(ref due_rfc3339) = task.due {
-                    match DateTime::parse_from_rfc3339(&due_rfc3339) {
+                    match DateTime::parse_from_rfc3339(due_rfc3339) {
                         Err(e) => anyhow::bail!(e),
                         Ok(dt_utc_fixed) => {
                             // TODO: Add support for times, too. Currently, I just look at the days (`chrono::NaiveTime`s)

@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
      * know where it is and what you generated?
      */
 
-    let num_cols_opt = env::args().nth(1).map(|num_str| num_str.parse::<u16>()).map(|res| res.ok()).flatten();
+    let num_cols_opt = env::args().nth(1).map(|num_str| num_str.parse::<u16>()).and_then(|res| res.ok());
     
     rustls::crypto::ring::default_provider().install_default().unwrap();
 
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let toml_table: TomlOptions = toml::from_str(&std::fs::read_to_string(&toml_config_file).map_err(|_| io::Error::new(io::ErrorKind::NotFound, format!("File {toml_config_file:?} should exist and contain the config for gtasksprint")))?)?;
 
-    let secret = yup_oauth2::read_application_secret(&secret_file).await.expect(&format!("File {secret_file:?} should be a client secret JSON file downloaded from the Google Cloud console"));
+    let secret = yup_oauth2::read_application_secret(&secret_file).await.unwrap_or_else(|_| panic!("File {secret_file:?} should be a client secret JSON file downloaded from the Google Cloud console"));
 
     let auth = yup_oauth2::InstalledFlowAuthenticator::builder(
         secret,
@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("TOML-configured tasks_config.tasks_list_name should the name of one of the user's task lists")
             .id.as_ref().expect("User's TOML-configured tasks_config.tasks_list_name task-list should have an ID");
 
-    let result = hub.tasks().list(&tasklist_id)
+    let result = hub.tasks().list(tasklist_id)
              .show_hidden(false)
              .show_deleted(false)
              .show_completed(false)
