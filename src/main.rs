@@ -2,7 +2,6 @@ mod widgets;
 mod toml_options;
 use toml_options::TomlOptions;
 use google_tasks1::TasksHub;
-use rustls::crypto::CryptoProvider;
 use widgets::*;
 
 use std::{io,env};
@@ -11,6 +10,11 @@ use chrono::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    /* TODO: Somehow let the user know how the TOML file should look and where it should be if it
+     * doesn't exist! Maybe you generate a default one in the correct location and just let them
+     * know where it is and what you generated?
+     */
+
     let num_cols_opt = env::args().nth(1).map(|num_str| num_str.parse::<u16>()).map(|res| res.ok()).flatten();
     
     rustls::crypto::ring::default_provider().install_default().unwrap();
@@ -38,8 +42,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = hyper_util::client::legacy::Client::builder(
         hyper_util::rt::TokioExecutor::new()
-    )
-    .build(
+    ).build(
         hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .unwrap()
@@ -53,7 +56,11 @@ async fn main() -> anyhow::Result<()> {
     let max_due_date_rfc3339 = max_due_date.to_rfc3339();
 
     let tasklists = hub.tasklists().list().doit().await?.1.items.expect("User should have at least one tasklist");
-    let tasklist_id = tasklists.iter().find(|tasklist| tasklist.title.as_ref().is_some_and(|title| title == &toml_table.tasks_config.tasks_list_name)).expect("TOML-configured tasks_config.tasks_list_name should the name of one of the user's task lists").id.as_ref().expect("User's TOML-configured tasks_config.tasks_list_name task-list should have an ID");
+    let tasklist_id = tasklists
+        .iter()
+        .find(|tasklist| tasklist.title.as_ref().is_some_and(|title| title == &toml_table.tasks_config.tasks_list_name))
+        .expect("TOML-configured tasks_config.tasks_list_name should the name of one of the user's task lists")
+            .id.as_ref().expect("User's TOML-configured tasks_config.tasks_list_name task-list should have an ID");
 
     let result = hub.tasks().list(&tasklist_id)
              .show_hidden(false)
@@ -62,14 +69,15 @@ async fn main() -> anyhow::Result<()> {
              .max_results(-10)
              .due_max(&max_due_date_rfc3339)
              .doit().await?;
+    let tasks = result.1.items.expect("User's TOML-configured tasks_config.tasks_list_name should exist and have at least one task");
 
-    let tasks_text = result.1.items.map_or(String::from(""), |tasks_vec| {
-        tasks_vec.into_iter().map(|task| (String::from("• ") + &task.title.unwrap_or(String::from(""))) + &task.notes.map(|s| String::from("\n\t  ") + &s).unwrap_or(String::from("")) + "\n").collect()
-    });
+    let size = num_cols_opt
+        .or_else(|| termsize::get().map(|sz| sz.cols))
+        .expect("Program should either have been passed a width (in characters) as a CLI argument or should be able to get the current terminal from the OS");
 
-    let size = num_cols_opt.or_else(|| termsize::get().map(|sz| sz.cols)).expect("Program should either have been passed a width (in characters) as a CLI argument or should be able to get the current terminal from the OS");
-    let boxed_text = BoxedText::new(size, "Google Tasks", &tasks_text);
+    let boxed_text = Boxed::new(size, "Google Tasks", &tasks);
     boxed_text.draw(&mut io::stdout())?;
+
     Ok(())
 }
 
