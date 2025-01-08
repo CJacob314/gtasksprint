@@ -88,7 +88,7 @@ impl<'a> Boxed<'a> {
                     Print('│'),
                     SetForegroundColor(color),
                     Print(line),
-                    Print(" ".repeat(self.width as usize - 1 - line.len())),
+                    Print(" ".repeat(self.width as usize - 3 - line.chars().count())),
                     SetForegroundColor(Color::White),
                     Print("│\n"),
                 )?;
@@ -101,7 +101,7 @@ impl<'a> Boxed<'a> {
                         Print('│'),
                         SetForegroundColor(Color::Grey),
                         Print(line),
-                        Print(" ".repeat(self.width as usize - 1 - line.len()) + "│\n"),
+                        Print(" ".repeat(self.width as usize - 3 - line.chars().count()) + "│\n"),
                     )?;
                 }
             }
