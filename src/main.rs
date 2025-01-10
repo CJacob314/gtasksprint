@@ -6,7 +6,7 @@ use widgets::*;
 
 use std::{io,env};
 use directories as dirs;
-use chrono::prelude::*;
+use chrono::{prelude::*, Days};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -69,7 +69,11 @@ async fn main() -> anyhow::Result<()> {
              .max_results(-10)
              .due_max(&max_due_date_rfc3339)
              .doit().await?;
-    let tasks = result.1.items.expect("User's TOML-configured tasks_config.tasks_list_name should exist and have at least one task");
+    let mut tasks = result.1.items.expect("User's TOML-configured tasks_config.tasks_list_name should exist and have at least one task");
+    tasks.sort_by(|a,b| {
+        a.due.as_ref().map_or(Utc::now() + Days::new(36500), |date_str| DateTime::parse_from_rfc3339(&date_str).expect("Google tasks API should give valid RFC3339 dates").to_utc())
+        .cmp(&b.due.as_ref().map_or(Utc::now() + Days::new(36500), |date_str| DateTime::parse_from_rfc3339(&date_str).expect("Google tasks API should give valid RFC3339 dates").to_utc()))
+    });
 
     let size = num_cols_opt
         .or_else(|| termsize::get().map(|sz| sz.cols))
